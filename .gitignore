@@ -1,0 +1,415 @@
+# TEKNOFEST 5G Communication System .gitignore
+# Generated on June 10, 2025
+
+# ============================================================================
+# Python
+# ============================================================================
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+#  Usually these files are written by a python script from a template
+#  before PyInstaller builds the exe, so as to inject date/other infos into it.
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff:
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+target/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
+
+# pipenv
+#   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
+#   However, in case of collaboration, if having platform-specific dependencies or dependencies
+#   having no cross-platform support, pipenv may install dependencies that don't work, or not
+#   install all needed dependencies.
+#Pipfile.lock
+
+# PEP 582; used by e.g. github.com/David-OConnor/pyflow
+__pypackages__/
+
+# Celery stuff
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# ============================================================================
+# Machine Learning & AI Models
+# ============================================================================
+
+# PyTorch models
+*.pth
+*.pt
+*.ckpt
+
+# TensorFlow models
+*.h5
+*.pb
+saved_model/
+variables/
+
+# Model checkpoints and weights
+checkpoints/
+*.weights
+*.weight
+
+# Training data and datasets
+*.npz
+*.npy
+data/training_*
+data/validation_*
+data/test_*
+
+# Trained model artifacts
+models/*.pth
+models/*.pt
+models/*.h5
+models/trained_*
+models/checkpoint_*
+
+# TensorBoard logs
+runs/
+logs/tensorboard/
+
+# Weights & Biases
+wandb/
+
+# MLflow
+mlruns/
+
+# ============================================================================
+# Simulation Results & Logs
+# ============================================================================
+
+# Simulation logs
+logs/simulation_*.log
+logs/training_*.log
+logs/debug_*.log
+*.log
+
+# Result files
+results/
+output/
+simulation_results/
+*.csv
+*.json
+*.pkl
+*.pickle
+
+# Temporary simulation files
+temp/
+tmp/
+*.tmp
+*.temp
+
+# Performance metrics
+metrics/
+performance/
+benchmarks/
+
+# Competition results
+competition_*.json
+submission_*.zip
+scores_*.csv
+
+# Generated plots and visualizations
+plots/
+figures/
+*.png
+*.jpg
+*.jpeg
+*.pdf
+*.svg
+!data/sample_visualization.png  # Keep the sample
+
+# ============================================================================
+# Development & IDE
+# ============================================================================
+
+# Visual Studio Code
+.vscode/
+*.code-workspace
+
+# PyCharm
+.idea/
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# ============================================================================
+# Operating System
+# ============================================================================
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# ============================================================================
+# Communication System Specific
+# ============================================================================
+
+# Generated OFDM waveforms
+waveforms/
+signals/
+*.wav
+*.raw
+*.iq
+
+# Channel models and data
+channel_data/
+interference_patterns/
+noise_samples/
+
+# Frequency hopping sequences
+hopping_sequences/
+frequency_plans/
+
+# Test data files
+test_files/
+transmitted_*
+received_*
+reconstructed_*
+
+# Configuration backups
+config_backup_*
+settings_*.json
+
+# Hardware interface files (if any)
+*.dll
+*.so.*
+drivers/
+
+# ============================================================================
+# Documentation Build
+# ============================================================================
+
+# LaTeX
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.synctex.gz
+*.toc
+*.md
+!README.md
+
+# Markdown artifacts
+*.html
+node_modules/
+
+# ============================================================================
+# Security & Credentials
+# ============================================================================
+
+# API keys and secrets
+.env
+.secrets
+credentials.json
+api_keys.txt
+*.key
+*.pem
+*.crt
+
+# Competition submission keys
+submission_key.txt
+team_credentials.json
+
+# ============================================================================
+# Backup & Archive Files
+# ============================================================================
+
+# Archive files
+*.zip
+*.tar.gz
+*.rar
+*.7z
+*.bz2
+*.xz
+
+# Backup files
+*.bak
+*.backup
+*.old
+*~
+
+# ============================================================================
+# Custom Project Exclusions
+# ============================================================================
+
+# Large simulation datasets
+large_datasets/
+big_data/
+
+# External libraries (if vendored)
+vendor/
+third_party/
+
+# User-specific configurations
+user_config.py
+personal_settings.json
+
+# Temporary GUI files
+gui_temp/
+ui_cache/
+
+# Competition-specific
+TEKNOFEST_submission/
+final_submission/
