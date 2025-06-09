@@ -122,7 +122,7 @@ Band 5: 2.600 GHz (Maximum throughput, high frequency)
 ## 📁 Project Structure
 
 ```
-simulation/
+sara-simulation/
 ├── core/                      # Core communication modules
 │   ├── modulation.py          # OFDM and modulation schemes (BPSK-1024QAM)
 │   ├── channel.py             # Channel modeling and interference simulation
@@ -199,9 +199,9 @@ simulation/
 - CUDA-compatible GPU (optional, for faster training)
 
 ### Quick Setup
-```bash
+```powershell
 # Clone or download the project
-cd simulation
+cd sara-simulation
 
 # Install dependencies
 pip install -r requirements.txt
@@ -211,7 +211,7 @@ python setup.py
 ```
 
 ### Manual Dependency Installation
-```bash
+```powershell
 pip install torch torchvision torchaudio
 pip install PyQt5 matplotlib numpy scipy
 pip install tqdm commpy
@@ -219,10 +219,16 @@ pip install tqdm commpy
 
 ## 🚀 Usage Guide
 
+> **📝 Command Format Update**: This system now uses `--mode` based commands for better organization:
+> - GUI: `python main.py --mode gui`
+> - Simulation: `python main.py --mode simulation`
+> - Training: `python main.py --mode training`
+> - Data Generation: `python main.py --mode data`
+
 ### 1. Quick Start - Enhanced GUI Mode
 ```powershell
 # Launch the enhanced GUI with all security features
-python main.py --gui
+python main.py --mode gui
 ```
 🎮 **GUI Features**:
 - Real-time security event monitoring with 🔒 and ⚠️ indicators
@@ -231,31 +237,41 @@ python main.py --gui
 - Interactive scenario switching between no jammer, pattern jammer, and random jammer
 - File size selection (100MB, 1GB, 10GB) for realistic transmission testing
 
-### 2. Security Algorithm Testing
+### 2. Competition Simulation
 ```powershell
-# Test security features with pattern jammer
-python main.py --gui --scenario 2
-```
-🔐 **Security Monitoring**:
-- Watch real-time LDPC/Turbo error correction in action
-- Monitor jammer detection and frequency hopping countermeasures
-- Observe data integrity verification with CRC-32 and SHA-256
+# Run full competition simulation
+python main.py --mode simulation
 
-### 3. Sub-band Analysis Mode
-```powershell
-# Focus on frequency spectrum monitoring
-python main.py --gui --scenario 3
+# Run specific competition phases
+python main.py --mode simulation --phases 1 2 3
+
+# Run with custom file sizes (in MB)
+python main.py --mode simulation --phases 1 2 --file-sizes 100 500
 ```
-📊 **Sub-band Features**:
-- View SNR levels across all 5 frequency bands simultaneously
-- See active transmission band highlighted in green
-- Monitor jammed bands shown in red with degraded SNR
-- Track frequency hopping decisions in real-time
+🔐 **Simulation Features**:
+- Complete competition environment with all three phases
+- Automatic performance scoring and evaluation
+- Real-time adaptation to jamming patterns
+- Comprehensive results analysis and logging
+
+### 3. AI Model Training
+```powershell
+# Train the AI frequency hopping model
+python main.py --mode training --samples 5000
+
+# Generate training data
+python main.py --mode data --samples 3000
+```
+📊 **AI Training Features**:
+- CNN-based frequency selection model training
+- Synthetic data generation for various jamming scenarios
+- Performance comparison with rule-based strategies
+- Model validation and optimization
 
 ### 4. Data Transmission Verification
 ```powershell
 # Verify real data transmission capabilities
-python test_system.py
+python test_system.py --verbose
 ```
 📁 **Real Data Transmission**:
 - Creates test files with mixed text and binary content
@@ -271,40 +287,50 @@ python test_system.py
 # Display comprehensive help
 python main.py --help
 
-# Launch GUI with enhanced security monitoring
-python main.py --gui --scenario 2
+# Launch GUI mode (default)
+python main.py --mode gui
 
-# Test sub-band SNR monitoring with random jammer
-python main.py --gui --scenario 3 --file-size 1GB
+# Run full competition simulation
+python main.py --mode simulation --verbose
 
-# Run security algorithm validation
-python test_system.py
+# Run specific phases with custom settings
+python main.py --mode simulation --phases 2 3 --file-sizes 500 1000
 
-# Verify data transmission integrity
+# Train AI model with custom sample size
+python main.py --mode training --samples 3000 --verbose
+
+# Generate training data
+python main.py --mode data --samples 2000
+
+# Run without AI (rule-based decisions only)
+python main.py --mode simulation --no-ai
+```
+
+### System Testing Commands
+```powershell
+# Run comprehensive system tests
+python test_system.py --verbose
+
+# Test GUI functionality
+python test_gui_ready.py
+
+# Test enhanced frequency hopping
+python test_enhanced_frequency_hopping.py
+
+# Verify AI model authenticity
+python verify_ai_authenticity.py
+
+# Final system validation
 python final_validation.py
 ```
 
-### Security Testing Commands
-```powershell
-# Test enhanced frequency hopping with security logging
-python test_enhanced_frequency_hopping.py
-
-# Validate GUI security features
-python test_gui_ready.py
-
-# Run comprehensive system tests
-python test_system.py --verbose
-```
-
 ### Configuration Options
-- `--scenario {1,2,3}`: Competition phase (No Jammer/Pattern Jammer/Random Jammer)
-- `--file-size`: Transmission file size (100MB, 1GB, 10GB)
-- `--gui`: Launch enhanced GUI with security monitoring
-- `--verbose`: Enable detailed security event logging
-- `--batch-size SIZE`: Training batch size
-- `--learning-rate RATE`: Learning rate for optimizer
-- `--ai-hopping`: Enable AI-based frequency hopping
-- `--verbose`: Enable detailed logging output
+- `--mode {gui,simulation,training,data}`: Application mode (default: gui)
+- `--phases {1,2,3}`: Competition phases to run (can specify multiple)
+- `--file-sizes`: File sizes in MB for each phase (space-separated)
+- `--no-ai`: Disable AI model and use rule-based frequency hopping
+- `--samples SIZE`: Number of samples for training/data generation (default: 5000)
+- `--verbose, -v`: Enable detailed logging output
 
 ## 🔧 Technical Specifications
 
@@ -382,45 +408,50 @@ CNN Frequency Selector:
 ### Common Issues
 
 #### Installation Problems
-```bash
+```powershell
 # Missing PyQt5
 pip install PyQt5
 
 # CUDA issues (for GPU training)
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
 
-# Missing system libraries
-sudo apt-get install python3-dev python3-tk  # Linux
-brew install python-tk  # macOS
+# Missing system libraries on Windows
+# Ensure Visual C++ Build Tools are installed
+# Download from: https://visualstudio.microsoft.com/visual-cpp-build-tools/
 ```
 
 #### Runtime Errors
-```bash
+```powershell
 # Module import errors
-export PYTHONPATH="${PYTHONPATH}:$(pwd)"
+$env:PYTHONPATH += ";$(pwd)"
 
 # Memory issues during training
-python main.py --train --batch-size 16  # Reduce batch size
+python main.py --mode training --samples 1000  # Reduce sample size
 
-# GUI display problems
-export QT_QPA_PLATFORM=xcb  # Linux X11 issues
+# GUI display problems on Windows
+# Usually resolved by installing latest PyQt5
+pip install --upgrade PyQt5
 ```
 
 #### Performance Issues
-- **Slow training**: Enable CUDA if available, reduce batch size
+- **Slow training**: Enable CUDA if available, reduce sample count
 - **GUI lag**: Close unnecessary applications, reduce plot update frequency
-- **Memory usage**: Limit data generation samples, use smaller models
+- **Memory usage**: Limit data generation samples with `--samples` parameter
 
 ### Debug Mode
-```bash
+```powershell
 # Enable verbose logging
-python main.py --verbose --gui
+python main.py --mode gui --verbose
 
 # Check system status
 python setup.py
 
 # Run diagnostics
 python test_system.py --verbose
+
+# Test specific components
+python test_gui_ready.py
+python verify_ai_authenticity.py
 ```
 
 ## 🧪 Testing and Validation
@@ -433,16 +464,23 @@ python test_system.py --verbose
 5. **End-to-End Tests**: Complete workflow validation
 
 ### Running Tests
-```bash
+```powershell
 # Full test suite
-python test_system.py
+python test_system.py --verbose
 
-# Specific test categories
-python test_system.py --unit-only
-python test_system.py --performance-only
-python test_system.py --integration-only
+# Test GUI components
+python test_gui_ready.py
 
-# Test with coverage
+# Test frequency hopping algorithms
+python test_enhanced_frequency_hopping.py
+
+# Verify AI model authenticity
+python verify_ai_authenticity.py
+
+# Run final system validation
+python final_validation.py
+
+# Test with coverage (optional)
 pip install coverage
 coverage run test_system.py
 coverage report -m
@@ -451,15 +489,15 @@ coverage report -m
 ## 📈 Performance Optimization
 
 ### Training Optimization
-```bash
-# Use GPU acceleration
-python main.py --train --device cuda
+```powershell
+# Train AI model with GPU acceleration (if available)
+python main.py --mode training --samples 5000 --verbose
 
-# Parallel data loading
-python main.py --train --num-workers 4
+# Generate larger training datasets
+python main.py --mode data --samples 10000
 
-# Mixed precision training
-python main.py --train --mixed-precision
+# Run simulation without AI for comparison
+python main.py --mode simulation --no-ai --verbose
 ```
 
 ### Runtime Optimization
@@ -488,11 +526,33 @@ python main.py --train --mixed-precision
 3. Implement `generate_interference()` method
 4. Register in scenario configurations
 
+## ✅ Quick Validation
+
+After installation, verify everything works correctly:
+
+```powershell
+# Check system dependencies
+python setup.py
+
+# Test basic functionality
+python test_system.py --verbose
+
+# Launch GUI to verify interface
+python main.py --mode gui
+
+# Test AI model functionality
+python verify_ai_authenticity.py
+
+# Run a quick simulation
+python main.py --mode simulation --phases 1 --file-sizes 10 --verbose
+```
+
+If all commands execute without errors, your installation is complete and ready for the competition!
+
 ## 📚 References and Documentation
 
 ### Competition Resources
 - [TEKNOFEST Official Website](https://www.teknofest.org/)
-- Competition specification: `YARISMA_SARTNAMESI.md`
 - 5G NR specifications: 3GPP TS 38.211-214
 
 ### Technical References
@@ -501,23 +561,22 @@ python main.py --train --mixed-precision
 - **Machine Learning**: "Deep Learning" by Goodfellow, Bengio & Courville
 - **Software Radio**: "Software Radio Architecture" by Tuttlebee
 
-### Dependencies Documentation
-- [PyTorch](https://pytorch.org/docs/): Deep learning framework
-- [PyQt5](https://doc.qt.io/qtforpython/): GUI development
-- [NumPy](https://numpy.org/doc/): Numerical computing
-- [SciPy](https://docs.scipy.org/): Signal processing
-- [Matplotlib](https://matplotlib.org/): Plotting and visualization
-
 ## 📄 License
 
 This project is developed for the TEKNOFEST Wireless Communication Competition. All rights reserved.
 
 ## 🤝 Contributing
 
-This is a competition project. For questions or suggestions, please contact the development team.
+This is a competition project developed for TEKNOFEST 2025. For questions or suggestions, please contact the development team.
+
+### 👨‍💻 Project Developers
+- **[@RAhsencicek](https://github.com/RAhsencicek)** - Lead Developer & AI Systems Engineer
+- **[@ihoflaz](https://github.com/ihoflaz)** - Core Systems Developer & GUI Architect
+
+For technical questions, bug reports, or collaboration inquiries, feel free to reach out through GitHub.
 
 ---
 
-**Last Updated**: December 2024  
+**Last Updated**: June 2025  
 **Version**: 1.0.0  
-**Competition**: TEKNOFEST 2024 Wireless Communication Challenge
+**Competition**: TEKNOFEST 2025 Wireless Communication Challenge
