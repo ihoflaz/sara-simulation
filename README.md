@@ -23,7 +23,7 @@ This system implements a complete 5G-compatible wireless communication solution 
 - **Channel quality assessment** with adaptive coding scheme selection
 
 ### 📈 Sub-band SNR Analysis
-- **Complete frequency spectrum monitoring** across all 5 bands (2.4-2.6 GHz)
+- **Complete frequency spectrum monitoring** across all 5 bands (2.400-2.420 GHz)
 - **Active transmission band highlighting** with green color coding
 - **Jammer impact visualization** showing SNR degradation in affected bands
 - **Real-time SNR estimation** for non-active bands with pattern jammer tracking
@@ -99,11 +99,11 @@ CRC (4 bytes): Packet integrity verification
 
 ### Frequency Band Allocation
 ```
-Band 1: 2.400 GHz (Stable, low frequency characteristics)
-Band 2: 2.450 GHz (Balanced performance)  
-Band 3: 2.500 GHz (Optimal for most conditions)
-Band 4: 2.550 GHz (High performance, sensitive to interference)
-Band 5: 2.600 GHz (Maximum throughput, high frequency)
+Band 1: 2.400 - 2.404 GHz (Center: 2.402 GHz)
+Band 2: 2.404 - 2.408 GHz (Center: 2.406 GHz)
+Band 3: 2.408 - 2.412 GHz (Center: 2.410 GHz)
+Band 4: 2.412 - 2.416 GHz (Center: 2.414 GHz)
+Band 5: 2.416 - 2.420 GHz (Center: 2.418 GHz)
 ```
 
 ### Visual Indicators
@@ -114,8 +114,8 @@ Band 5: 2.600 GHz (Maximum throughput, high frequency)
 - **Active Band Highlight**: Clear indication of current transmission frequency
 
 ### Jammer Impact Modeling
-- **Pattern Jammer**: Targets even-numbered bands (2, 4) with 15dB degradation
-- **Random Jammer**: 30% probability per band with 10-20dB interference
+- **Pattern Jammer**: Follows sequence 1 → 3 → 5 → 4 → 2 with 1-second band switching interval
+- **Random Jammer**: Random frequency hopping across all 5 bands with 1-second intervals  
 - **Adaptive Response**: Automatic frequency hopping to avoid compromised bands
 - **SNR Estimation**: Non-active bands estimated with realistic uncertainty
 
@@ -235,7 +235,7 @@ python main.py --mode gui
 - Sub-band SNR visualization showing jammer impact across all 5 frequency bands
 - Live constellation diagrams and performance metrics
 - Interactive scenario switching between no jammer, pattern jammer, and random jammer
-- File size selection (100MB, 1GB, 10GB) for realistic transmission testing
+- File size selection (100 MB, 1 GB, 10 GB) for realistic transmission testing
 
 ### 2. Competition Simulation
 ```powershell
@@ -341,12 +341,16 @@ python final_validation.py
 - **Storage**: 2GB free space for models and data
 
 ### Performance Characteristics
-- **Frequency Range**: 2.4-2.5 GHz (competition band)
-- **Bandwidth**: 20 MHz per channel
+- **Frequency Range**: 2.400-2.420 GHz (competition band)
+- **Total Bandwidth**: 20 MHz divided into 5 sub-bands of 4 MHz each
+- **Sub-band Width**: 4 MHz per frequency band
+- **Maximum Output Power**: 10 dBm (as per competition rules)
+- **Maximum Antenna Gain**: 6 dBi (as per competition rules)
 - **Modulation Support**: BPSK to 1024QAM adaptive
 - **Coding Rates**: 1/2, 2/3, 3/4, 5/6 for LDPC
 - **OFDM Parameters**: 1024 subcarriers, 256 data carriers
 - **Frame Duration**: 1ms (1000 symbols/second)
+- **Jammer Switching Interval**: 1 second per frequency band
 
 ### AI Model Architecture
 ```
@@ -386,22 +390,46 @@ CNN Frequency Selector:
 ## 🔍 Competition Scenarios
 
 ### Phase 1: Basic Communication
-- **Duration**: 5 minutes
-- **Jammers**: None
-- **Objective**: Establish reliable communication
-- **Success Criteria**: BER < 10^-3, Throughput > 1 Mbps
+- **Description**: Data transmission without jammers on 20 MHz spectrum
+- **Distance**: Same table initially, then 15 meters between transmitter and receiver
+- **File Sizes**: 1 GB and 10 GB data files from USB storage
+- **Objective**: Establish reliable communication baseline
+- **Success Criteria**: Complete file transmission with minimum errors
 
-### Phase 2: Jammer Avoidance
-- **Duration**: 10 minutes  
-- **Jammers**: Pattern-based (3 types)
-- **Objective**: Maintain communication under jamming
-- **Success Criteria**: BER < 10^-2, Throughput > 500 kbps
+### Phase 2: Pattern-based Jammer Avoidance
+- **Description**: Fixed jammer pattern following sequence 1 → 3 → 5 → 4 → 2
+- **Jammer Switching**: 1-second intervals between frequency bands
+- **File Sizes**: 100 MB initially, then 1 GB if time permits
+- **Objective**: Maintain communication under predictable jamming patterns
+- **Success Criteria**: Successful data transmission despite jamming interference
 
-### Phase 3: Advanced Scenarios
-- **Duration**: 15 minutes
-- **Jammers**: Adaptive and random (5+ types)
-- **Objective**: Optimize performance under severe interference
-- **Success Criteria**: BER < 5×10^-2, Throughput > 200 kbps
+### Phase 3: Random Jammer Scenarios (BONUS)
+- **Description**: Random frequency hopping jammer across all 5 bands
+- **Jammer Switching**: 1-second random intervals between bands
+- **File Sizes**: 100 MB initially, then 1 GB if time permits  
+- **Objective**: Adaptive spectrum management under unpredictable interference
+- **Success Criteria**: Bonus points for successful transmission under random jamming
+
+## 🏆 Official Evaluation Criteria
+
+### Primary Scoring Factors
+1. **File Transmission Success**: Complete and error-free file delivery with highest throughput
+2. **Adaptive Frequency Usage**: Fast and accurate adaptation to jammer frequency changes
+3. **Adaptive Modulation & Coding**: Dynamic modulation schemes and error correction (FEC, LDPC, Turbo)
+4. **Data Security & Error Detection**: CRC, checksum mechanisms and retransmission capabilities
+5. **User Interface & Live Parameters**: Real-time display of modulation, coding, sub-band status, and throughput
+
+### Bonus Point Opportunities
+- **5G Waveform Usage**: Implementation of 5G-compatible modulation and waveforms
+- **Advanced Channel Coding**: LDPC, Turbo codes with adaptive selection
+- **Real-time Parameter Display**: Live visualization of modulation, coding type, active sub-bands
+- **Sophisticated Jammer Avoidance**: Beyond basic frequency hopping, including data recovery algorithms
+
+### Competition Hardware Requirements
+- **Maximum Output Power**: 10 dBm (verified via SMA cable measurement)
+- **Maximum Antenna Gain**: 6 dBi limit
+- **Recommended SDR**: ADALM-PLUTO or equivalent with external antenna ports
+- **Spectrum Compliance**: Must stay within 2.400-2.420 GHz band (violations disqualify transmission)
 
 ## 🐛 Troubleshooting
 
