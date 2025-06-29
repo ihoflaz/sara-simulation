@@ -1,6 +1,6 @@
 """
 Data Processing and File Handling
-CRC, packetization, and data integrity management
+CRC, packetization, data integrity management, encryption, and recovery
 """
 
 import numpy as np
@@ -11,6 +11,21 @@ from typing import Tuple, List, Dict, Optional, Union
 import struct
 
 from config import DATA_SIZES, SIMULATION_CONFIG
+
+# Import new security and recovery modules
+try:
+    from core.encryption import EncryptedPacketProcessor
+    ENCRYPTION_AVAILABLE = True
+except ImportError:
+    print("⚠️  Encryption module not available")
+    ENCRYPTION_AVAILABLE = False
+
+try:
+    from core.recovery import DataRecoveryManager, RecoveryMode
+    RECOVERY_AVAILABLE = True
+except ImportError:
+    print("⚠️  Recovery module not available")
+    RECOVERY_AVAILABLE = False
 
 class DataPacketizer:
     """Handle data packetization and reassembly"""
@@ -520,3 +535,496 @@ class DataIntegrityManager:
             'total_checks': len(self.integrity_checks),
             'checks': self.integrity_checks.copy()
         }
+
+class EnhancedTransmissionSimulator:
+    """Enhanced transmission simulator with encryption and recovery capabilities"""
+    
+    def __init__(self, encryption_enabled: bool = False, recovery_enabled: bool = True):
+        """
+        Initialize enhanced transmission simulator
+        
+        Args:
+            encryption_enabled: Enable AES-128 encryption
+            recovery_enabled: Enable data recovery algorithms
+        """
+        # Base components
+        self.packetizer = DataPacketizer()
+        self.file_processor = FileProcessor()
+        
+        # Enhanced security and recovery components
+        self.encryption_enabled = encryption_enabled
+        self.recovery_enabled = recovery_enabled
+        
+        # Initialize encryption processor
+        if ENCRYPTION_AVAILABLE and encryption_enabled:
+            self.encryption_processor = EncryptedPacketProcessor(
+                encryption_enabled=True, 
+                mode='CTR'  # CTR mode for compatibility
+            )
+        else:
+            self.encryption_processor = None
+            
+        # Initialize recovery manager
+        if RECOVERY_AVAILABLE and recovery_enabled:
+            self.recovery_manager = DataRecoveryManager(mode=RecoveryMode.ADAPTIVE)
+            self.recovery_manager.set_recovery_callback(self._handle_recovery_event)
+        else:
+            self.recovery_manager = None
+        
+        # Transmission parameters
+        self.bit_rate = 10e6  # 10 Mbps base rate
+        self.current_modulation = 'QPSK'
+        self.packet_loss_rate = 0.01  # 1% packet loss
+        self.transmission_overhead = 1.2  # 20% overhead
+        
+        # Enhanced statistics
+        self.transmission_stats = {
+            'total_packets_sent': 0,
+            'total_packets_received': 0,
+            'encrypted_packets': 0,
+            'decrypted_packets': 0,
+            'recovered_packets': 0,
+            'failed_recoveries': 0,
+            'encryption_failures': 0,
+            'decryption_failures': 0,
+        }
+        
+    def set_encryption_enabled(self, enabled: bool, mode: str = 'CTR'):
+        """Enable or disable encryption"""
+        self.encryption_enabled = enabled
+        
+        if ENCRYPTION_AVAILABLE and enabled:
+            self.encryption_processor = EncryptedPacketProcessor(
+                encryption_enabled=True, 
+                mode=mode
+            )
+        else:
+            self.encryption_processor = None
+    
+    def set_recovery_enabled(self, enabled: bool, mode: RecoveryMode = RecoveryMode.ADAPTIVE):
+        """Enable or disable data recovery"""
+        self.recovery_enabled = enabled
+        
+        if RECOVERY_AVAILABLE and enabled:
+            if self.recovery_manager is None:
+                self.recovery_manager = DataRecoveryManager(mode=mode)
+                self.recovery_manager.set_recovery_callback(self._handle_recovery_event)
+            else:
+                self.recovery_manager.set_recovery_mode(mode)
+        else:
+            if self.recovery_manager:
+                self.recovery_manager.stop_recovery_thread()
+            self.recovery_manager = None
+    
+    def simulate_enhanced_packet_transmission(self, packets: List[bytes], 
+                                            channel_quality: str = 'good',
+                                            jammed_bands: List[int] = []) -> Tuple[List[bytes], Dict]:
+        """
+        Enhanced packet transmission simulation with encryption and recovery
+        
+        Args:
+            packets: List of packets to transmit
+            channel_quality: Channel quality ('excellent', 'good', 'fair', 'poor')
+            jammed_bands: List of jammed frequency bands
+            
+        Returns:
+            (received_packets, transmission_stats)
+        """
+        start_time = time.time()
+        
+        # Prepare packets for transmission
+        processed_packets = []
+        encryption_info = []
+        
+        for i, packet in enumerate(packets):
+            if self.encryption_processor:
+                # Encrypt packet
+                try:
+                    encrypted_packet, enc_info = self.encryption_processor.process_outgoing_packet(packet, i)
+                    processed_packets.append(encrypted_packet)
+                    encryption_info.append(enc_info)
+                    
+                    if enc_info.get('encrypted', False):
+                        self.transmission_stats['encrypted_packets'] += 1
+                    else:
+                        self.transmission_stats['encryption_failures'] += 1
+                        
+                except Exception as e:
+                    # Encryption failed, use original packet
+                    processed_packets.append(packet)
+                    encryption_info.append({'encrypted': False, 'error': str(e)})
+                    self.transmission_stats['encryption_failures'] += 1
+            else:
+                # No encryption
+                processed_packets.append(packet)
+                encryption_info.append({'encrypted': False})
+        
+        # Apply recovery redundancy if enabled
+        if self.recovery_manager:
+            # Add redundant packets or erasure coding
+            if self.recovery_manager.mode in [RecoveryMode.REDUNDANT_PACKETS, RecoveryMode.ADAPTIVE]:
+                processed_packets = self.recovery_manager.generate_redundant_packets(processed_packets)
+            elif self.recovery_manager.mode in [RecoveryMode.ERASURE_CODING, RecoveryMode.ADAPTIVE]:
+                processed_packets = self.recovery_manager.generate_erasure_coded_packets(processed_packets)
+        
+        # Simulate transmission with losses and errors
+        received_packets, base_stats = self._simulate_transmission_with_jamming(
+            processed_packets, channel_quality, jammed_bands
+        )
+        
+        # Process received packets (decrypt if needed)
+        final_packets = []
+        decryption_info = []
+        
+        for i, packet in enumerate(received_packets):
+            if packet is None:
+                final_packets.append(None)
+                decryption_info.append({'decrypted': False, 'reason': 'packet_lost'})
+                continue
+                
+            if self.encryption_processor:
+                # Decrypt packet
+                try:
+                    decrypted_packet, dec_info = self.encryption_processor.process_incoming_packet(packet, i)
+                    final_packets.append(decrypted_packet)
+                    decryption_info.append(dec_info)
+                    
+                    if dec_info.get('encrypted', False):
+                        self.transmission_stats['decrypted_packets'] += 1
+                    else:
+                        self.transmission_stats['decryption_failures'] += 1
+                        
+                except Exception as e:
+                    # Decryption failed, report as corrupted
+                    final_packets.append(None)
+                    decryption_info.append({'decrypted': False, 'error': str(e)})
+                    self.transmission_stats['decryption_failures'] += 1
+                    
+                    # Report to recovery manager if available
+                    if self.recovery_manager:
+                        self.recovery_manager.report_transmission_failure(
+                            i, packet, 'decryption_failed', 
+                            self._get_channel_quality_value(channel_quality), 1
+                        )
+            else:
+                # No decryption needed
+                final_packets.append(packet)
+                decryption_info.append({'encrypted': False})
+        
+        # Update transmission statistics
+        self.transmission_stats['total_packets_sent'] += len(packets)
+        self.transmission_stats['total_packets_received'] += len([p for p in final_packets if p is not None])
+        
+        # Compile enhanced transmission statistics
+        enhanced_stats = {
+            'base_transmission': base_stats,
+            'encryption_enabled': self.encryption_enabled,
+            'recovery_enabled': self.recovery_enabled,
+            'processed_packets': len(processed_packets),
+            'original_packets': len(packets),
+            'received_packets': len([p for p in final_packets if p is not None]),
+            'encryption_info': encryption_info,
+            'decryption_info': decryption_info,
+            'transmission_time': time.time() - start_time,
+            'jammed_bands': jammed_bands,
+            'channel_quality': channel_quality
+        }
+        
+        # Add encryption statistics if available
+        if self.encryption_processor:
+            enhanced_stats['encryption_stats'] = self.encryption_processor.get_encryption_stats()
+        
+        # Add recovery statistics if available
+        if self.recovery_manager:
+            enhanced_stats['recovery_stats'] = self.recovery_manager.get_recovery_stats()
+            enhanced_stats['recovery_recommendations'] = self.recovery_manager.get_recovery_recommendations()
+        
+        return final_packets, enhanced_stats
+    
+    def simulate_enhanced_file_transmission(self, filepath: str, 
+                                         channel_quality: str = 'good',
+                                         modulation: str = 'QPSK',
+                                         jammed_bands: List[int] = [],
+                                         enable_recovery: bool = True) -> Dict:
+        """
+        Enhanced file transmission simulation with encryption and recovery
+        
+        Args:
+            filepath: Path to file to transmit
+            channel_quality: Channel quality setting
+            modulation: Modulation scheme to use
+            jammed_bands: List of jammed frequency bands
+            enable_recovery: Enable recovery mechanisms for this transmission
+            
+        Returns:
+            Comprehensive transmission results
+        """
+        start_time = time.time()
+        
+        # Prepare file for transmission
+        transmission_data, metadata = self.file_processor.prepare_file_for_transmission(filepath)
+        
+        # Packetize data
+        packets = self.packetizer.packetize_data(transmission_data)
+        
+        # Estimate transmission time
+        estimated_time = self.estimate_transmission_time(len(transmission_data), modulation)
+        
+        # Enhanced transmission with encryption and recovery
+        received_packets, transmission_stats = self.simulate_enhanced_packet_transmission(
+            packets, channel_quality, jammed_bands
+        )
+        
+        # Attempt reassembly
+        reassembled_data, reassembly_success = self.packetizer.reassemble_data(
+            [p for p in received_packets if p is not None]
+        )
+        
+        # Attempt file reconstruction if reassembly successful
+        reconstruction_success = False
+        reconstruction_info = {}
+        
+        if reassembly_success:
+            output_path = f"received_{os.path.basename(filepath)}"
+            reconstruction_success, reconstruction_info = (
+                self.file_processor.reconstruct_file_from_transmission(
+                    reassembled_data, output_path
+                )
+            )
+        
+        # If reconstruction failed and recovery is enabled, attempt recovery
+        recovery_attempts = 0
+        if not reconstruction_success and enable_recovery and self.recovery_manager:
+            recovery_attempts = self._attempt_file_recovery(
+                packets, received_packets, filepath, channel_quality, jammed_bands
+            )
+        
+        end_time = time.time()
+        actual_time = end_time - start_time
+        
+        # Compile comprehensive results
+        enhanced_results = {
+            'file_info': {
+                'original_path': filepath,
+                'original_size': metadata['original_size'],
+                'transmission_size': metadata['transmission_size']
+            },
+            'transmission_stats': transmission_stats,
+            'timing': {
+                'estimated_time': estimated_time,
+                'actual_simulation_time': actual_time,
+                'throughput_mbps': (metadata['original_size'] * 8) / (estimated_time * 1e6)
+            },
+            'reassembly': {
+                'success': reassembly_success,
+                'received_packets': len([p for p in received_packets if p is not None]),
+                'total_packets': len(packets)
+            },
+            'reconstruction': reconstruction_info,
+            'recovery_attempts': recovery_attempts,
+            'overall_success': reconstruction_success,
+            'modulation_used': modulation,
+            'channel_quality': channel_quality,
+            'jammed_bands': jammed_bands,
+            'security_features': {
+                'encryption_enabled': self.encryption_enabled,
+                'recovery_enabled': self.recovery_enabled,
+                'data_integrity_verified': reconstruction_success
+            }
+        }
+        
+        return enhanced_results
+    
+    def _simulate_transmission_with_jamming(self, packets: List[bytes], 
+                                          channel_quality: str, 
+                                          jammed_bands: List[int]) -> Tuple[List[Optional[bytes]], Dict]:
+        """Simulate transmission with jamming effects"""
+        # Quality-based loss rates
+        base_loss_rates = {
+            'excellent': 0.001,
+            'good': 0.01,
+            'fair': 0.05,
+            'poor': 0.15
+        }
+        
+        # Increase loss rate if bands are jammed
+        packet_loss_rate = base_loss_rates.get(channel_quality, 0.01)
+        if jammed_bands:
+            # Simulate jamming effect (increase loss rate)
+            jamming_factor = min(len(jammed_bands) / 5.0, 0.8)  # Max 80% additional loss
+            packet_loss_rate += jamming_factor * 0.3
+        
+        received_packets = []
+        transmission_stats = {
+            'total_packets': len(packets),
+            'transmitted_packets': 0,
+            'lost_packets': 0,
+            'corrupted_packets': 0,
+            'jammed_packets': 0,
+            'success_rate': 0
+        }
+        
+        for i, packet in enumerate(packets):
+            # Simulate packet loss due to jamming
+            if jammed_bands and np.random.random() < jamming_factor * 0.5:
+                received_packets.append(None)
+                transmission_stats['jammed_packets'] += 1
+                transmission_stats['lost_packets'] += 1
+                
+                # Report jamming to recovery manager
+                if self.recovery_manager:
+                    self.recovery_manager.report_transmission_failure(
+                        i, packet, 'jammed', 
+                        self._get_channel_quality_value(channel_quality), 
+                        jammed_bands[0] if jammed_bands else 1
+                    )
+                continue
+            
+            # Simulate general packet loss
+            if np.random.random() < packet_loss_rate:
+                received_packets.append(None)
+                transmission_stats['lost_packets'] += 1
+                
+                # Report timeout to recovery manager
+                if self.recovery_manager:
+                    self.recovery_manager.report_transmission_failure(
+                        i, packet, 'timeout', 
+                        self._get_channel_quality_value(channel_quality), 1
+                    )
+                continue
+            
+            # Simulate packet corruption
+            corruption_rate = packet_loss_rate / 2
+            if np.random.random() < corruption_rate:
+                # Corrupt random bytes in packet
+                corrupted_packet = bytearray(packet)
+                num_corruptions = np.random.randint(1, 5)
+                for _ in range(num_corruptions):
+                    pos = np.random.randint(0, len(corrupted_packet))
+                    corrupted_packet[pos] = np.random.randint(0, 256)
+                
+                received_packets.append(bytes(corrupted_packet))
+                transmission_stats['corrupted_packets'] += 1
+                
+                # Report corruption to recovery manager
+                if self.recovery_manager:
+                    self.recovery_manager.report_transmission_failure(
+                        i, packet, 'crc_failed', 
+                        self._get_channel_quality_value(channel_quality), 1
+                    )
+            else:
+                received_packets.append(packet)
+                
+                # Report success to recovery manager
+                if self.recovery_manager:
+                    self.recovery_manager.report_transmission_success(i)
+            
+            transmission_stats['transmitted_packets'] += 1
+        
+        transmission_stats['success_rate'] = (
+            (transmission_stats['transmitted_packets'] - transmission_stats['corrupted_packets']) /
+            max(1, transmission_stats['total_packets'])
+        )
+        
+        return received_packets, transmission_stats
+    
+    def _attempt_file_recovery(self, original_packets: List[bytes], 
+                             received_packets: List[Optional[bytes]], 
+                             filepath: str, channel_quality: str, 
+                             jammed_bands: List[int]) -> int:
+        """Attempt to recover failed file transmission"""
+        recovery_attempts = 0
+        max_recovery_attempts = 3
+        
+        while recovery_attempts < max_recovery_attempts:
+            recovery_attempts += 1
+            
+            # Get retry packets from recovery manager
+            retry_info = self.recovery_manager.get_next_retry_packet()
+            if retry_info is None:
+                break
+                
+            packet_id, packet_data, recovery_method = retry_info
+            
+            # Simulate retry transmission
+            if recovery_method == "redundant":
+                # Send multiple copies
+                for _ in range(self.recovery_manager.redundancy_factor):
+                    success = np.random.random() > 0.3  # 70% success rate for retries
+                    if success:
+                        if packet_id < len(received_packets):
+                            received_packets[packet_id] = packet_data
+                        self.recovery_manager.report_transmission_success(packet_id)
+                        self.transmission_stats['recovered_packets'] += 1
+                        break
+            
+            elif recovery_method == "erasure_coding":
+                # Use erasure coding recovery
+                erasure_positions = [i for i, p in enumerate(received_packets) if p is None]
+                if len(erasure_positions) <= self.recovery_manager.reed_solomon.recovery_blocks:
+                    try:
+                        recovered = self.recovery_manager.recover_from_erasure_coded_packets(
+                            received_packets, erasure_positions
+                        )
+                        received_packets[:len(recovered)] = recovered
+                        self.transmission_stats['recovered_packets'] += len(erasure_positions)
+                        
+                        for pos in erasure_positions:
+                            self.recovery_manager.report_transmission_success(pos)
+                    except Exception:
+                        self.transmission_stats['failed_recoveries'] += 1
+            
+            else:  # Simple retry
+                success = np.random.random() > 0.2  # 80% success rate for retries
+                if success:
+                    if packet_id < len(received_packets):
+                        received_packets[packet_id] = packet_data
+                    self.recovery_manager.report_transmission_success(packet_id)
+                    self.transmission_stats['recovered_packets'] += 1
+        
+        return recovery_attempts
+    
+    def _get_channel_quality_value(self, quality_str: str) -> float:
+        """Convert channel quality string to numeric value"""
+        quality_map = {
+            'excellent': 0.95,
+            'good': 0.75,
+            'fair': 0.50,
+            'poor': 0.25
+        }
+        return quality_map.get(quality_str, 0.5)
+    
+    def _handle_recovery_event(self, event_type: str, event_data: Dict):
+        """Handle recovery events for logging and statistics"""
+        if event_type == "packet_recovered":
+            self.transmission_stats['recovered_packets'] += 1
+        elif event_type == "retry_limit_reached":
+            self.transmission_stats['failed_recoveries'] += 1
+        
+        # Log event (could be extended to write to file or GUI)
+        print(f"Recovery Event: {event_type} - {event_data}")
+    
+    def get_comprehensive_stats(self) -> Dict:
+        """Get comprehensive transmission statistics"""
+        stats = self.transmission_stats.copy()
+        
+        # Add encryption stats if available
+        if self.encryption_processor:
+            stats['encryption'] = self.encryption_processor.get_encryption_stats()
+        
+        # Add recovery stats if available
+        if self.recovery_manager:
+            stats['recovery'] = self.recovery_manager.get_recovery_stats()
+        
+        return stats
+    
+    def export_security_key(self) -> Optional[str]:
+        """Export encryption key for sharing between transmitter and receiver"""
+        if self.encryption_processor:
+            return self.encryption_processor.export_encryption_key()
+        return None
+    
+    def import_security_key(self, key_hex: str):
+        """Import encryption key"""
+        if self.encryption_processor:
+            self.encryption_processor.import_encryption_key(key_hex)

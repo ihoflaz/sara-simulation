@@ -16,7 +16,7 @@ from PyQt5.QtGui import QFont, QPixmap, QPalette, QColor
 import threading
 import time
 from datetime import datetime
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 import json
 
 # Import our modules
@@ -50,6 +50,17 @@ except ImportError as e:
 
 from core.data_processing import TransmissionSimulator
 import torch
+
+# Import enhanced modules
+try:
+    from core.enhanced_data_processing import EnhancedTransmissionSimulator, SecurityMetrics
+    from core.encryption import EncryptedPacketProcessor
+    from core.recovery import DataRecoveryManager, RecoveryMode
+    ENHANCED_FEATURES_AVAILABLE = True
+    print("✅ Enhanced security features available")
+except ImportError as e:
+    print(f"⚠️  Enhanced features not available: {e}")
+    ENHANCED_FEATURES_AVAILABLE = False
 
 class RealTimePlotter(QWidget):
     """Real-time plotting widget for signal analysis"""
@@ -178,6 +189,18 @@ class SimulationWorker(QThread):
         self.freq_hopping = AdaptiveFrequencyManager()
         self.data_processor = TransmissionSimulator()
         
+        # Initialize enhanced simulator if available
+        if ENHANCED_FEATURES_AVAILABLE:
+            self.enhanced_simulator = EnhancedTransmissionSimulator(
+                enable_encryption=True,
+                enable_recovery=True
+            )
+            # Set up event callbacks
+            self.enhanced_simulator.set_security_event_callback(self._handle_security_event)
+            self.enhanced_simulator.set_recovery_event_callback(self._handle_recovery_event)
+        else:
+            self.enhanced_simulator = None
+        
         # Load AI model if available
         try:
             self.ai_model = FrequencyHoppingCNN()
@@ -202,6 +225,15 @@ class SimulationWorker(QThread):
         self.current_modulation = 'QPSK'
         self.simulation_speed = 1.0
         
+        # Enhanced features initialization
+        if ENHANCED_FEATURES_AVAILABLE:
+            self.encryption_processor = EncryptedPacketProcessor()
+            self.recovery_manager = DataRecoveryManager()
+            self.log_message.emit("Enhanced security features initialized")
+        else:
+            self.encryption_processor = None
+            self.recovery_manager = None
+    
     def set_scenario(self, scenario: str):
         """Set simulation scenario"""
         self.current_scenario = scenario
@@ -633,6 +665,36 @@ class SimulationWorker(QThread):
             if time_factor % 5 < 1:  # Log every 5 seconds
                 self.log_message.emit(f"Rule: Staying in band {self.current_frequency_band} (quality: {adjusted_quality:.2f})")
             return self.current_frequency_band
+    
+    def _handle_security_event(self, event_type: str, message: str, data: Optional[Dict] = None):
+        """Handle security events from the enhanced simulator"""
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        if event_type == "info":
+            emoji = "🔐"
+        elif event_type == "warning":
+            emoji = "⚠️"
+        elif event_type == "critical":
+            emoji = "🚨"
+        else:
+            emoji = "ℹ️"
+        
+        log_message = f"[{timestamp}] {emoji} Security: {message}"
+        self.log_message.emit(log_message)
+    
+    def _handle_recovery_event(self, event_type: str, message: str, data: Optional[Dict] = None):
+        """Handle recovery events from the enhanced simulator"""
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        if event_type == "info":
+            emoji = "📦"
+        elif event_type == "warning":
+            emoji = "⚠️"
+        elif event_type == "retry":
+            emoji = "🔄"
+        else:
+            emoji = "ℹ️"
+        
+        log_message = f"[{timestamp}] {emoji} Recovery: {message}"
+        self.log_message.emit(log_message)
 
 class MainWindow(QMainWindow):
     """Main application window"""
@@ -783,6 +845,132 @@ class MainWindow(QMainWindow):
         
         layout.addWidget(log_group)
         
+        # Security and Recovery Controls
+        security_group = QGroupBox("🔐 Security & Recovery")
+        security_layout = QVBoxLayout(security_group)
+        
+        # Encryption Controls Group
+        encryption_group = QGroupBox("🔒 AES-128 Encryption")
+        encryption_layout = QGridLayout(encryption_group)
+        
+        # Encryption Enable/Disable
+        self.encryption_enabled_cb = QCheckBox("Enable AES-128 Encryption")
+        self.encryption_enabled_cb.setChecked(False)
+        self.encryption_enabled_cb.stateChanged.connect(self.toggle_encryption)
+        encryption_layout.addWidget(self.encryption_enabled_cb, 0, 0, 1, 2)
+        
+        # Encryption Mode Selection
+        encryption_layout.addWidget(QLabel("Encryption Mode:"), 1, 0)
+        self.encryption_mode_combo = QComboBox()
+        self.encryption_mode_combo.addItems(["CTR", "GCM"])
+        self.encryption_mode_combo.setCurrentText("CTR")
+        self.encryption_mode_combo.currentTextChanged.connect(self.change_encryption_mode)
+        encryption_layout.addWidget(self.encryption_mode_combo, 1, 1)
+        
+        # Key Management
+        encryption_layout.addWidget(QLabel("Encryption Key:"), 2, 0)
+        self.encryption_key_display = QLineEdit()
+        self.encryption_key_display.setPlaceholderText("Key will be generated automatically")
+        self.encryption_key_display.setReadOnly(True)
+        encryption_layout.addWidget(self.encryption_key_display, 2, 1)
+        
+        # Key Export/Import Buttons
+        key_buttons_layout = QHBoxLayout()
+        self.export_key_btn = QPushButton("Export Key")
+        self.export_key_btn.clicked.connect(self.export_encryption_key)
+        self.import_key_btn = QPushButton("Import Key")
+        self.import_key_btn.clicked.connect(self.import_encryption_key)
+        key_buttons_layout.addWidget(self.export_key_btn)
+        key_buttons_layout.addWidget(self.import_key_btn)
+        encryption_layout.addLayout(key_buttons_layout, 3, 0, 1, 2)
+        
+        # Encryption Statistics
+        self.encryption_stats_label = QLabel("Encryption Statistics:\nPackets Encrypted: 0\nPackets Decrypted: 0\nEncryption Success Rate: 0%")
+        encryption_layout.addWidget(self.encryption_stats_label, 4, 0, 1, 2)
+        
+        security_layout.addWidget(encryption_group)
+        
+        # Data Recovery Controls Group
+        recovery_group = QGroupBox("📡 Data Recovery Algorithm")
+        recovery_layout = QGridLayout(recovery_group)
+        
+        # Recovery Enable/Disable
+        self.recovery_enabled_cb = QCheckBox("Enable Data Recovery")
+        self.recovery_enabled_cb.setChecked(True)
+        self.recovery_enabled_cb.stateChanged.connect(self.toggle_recovery)
+        recovery_layout.addWidget(self.recovery_enabled_cb, 0, 0, 1, 2)
+        
+        # Recovery Mode Selection
+        recovery_layout.addWidget(QLabel("Recovery Mode:"), 1, 0)
+        self.recovery_mode_combo = QComboBox()
+        self.recovery_mode_combo.addItems([
+            "Adaptive", "Retry Only", "Redundant Packets", 
+            "Erasure Coding", "Disabled"
+        ])
+        self.recovery_mode_combo.setCurrentText("Adaptive")
+        self.recovery_mode_combo.currentTextChanged.connect(self.change_recovery_mode)
+        recovery_layout.addWidget(self.recovery_mode_combo, 1, 1)
+        
+        # Recovery Parameters
+        recovery_layout.addWidget(QLabel("Max Retry Attempts:"), 2, 0)
+        self.max_retries_spin = QSpinBox()
+        self.max_retries_spin.setRange(1, 10)
+        self.max_retries_spin.setValue(5)
+        self.max_retries_spin.valueChanged.connect(self.update_recovery_params)
+        recovery_layout.addWidget(self.max_retries_spin, 2, 1)
+        
+        recovery_layout.addWidget(QLabel("Redundancy Factor:"), 3, 0)
+        self.redundancy_factor_spin = QSpinBox()
+        self.redundancy_factor_spin.setRange(1, 5)
+        self.redundancy_factor_spin.setValue(2)
+        self.redundancy_factor_spin.valueChanged.connect(self.update_recovery_params)
+        recovery_layout.addWidget(self.redundancy_factor_spin, 3, 1)
+        
+        # Recovery Status Display
+        self.recovery_status_label = QLabel("Recovery Status: Standby")
+        self.recovery_status_label.setStyleSheet("QLabel { background-color: #e6f3ff; padding: 5px; border-radius: 3px; }")
+        recovery_layout.addWidget(self.recovery_status_label, 4, 0, 1, 2)
+        
+        # Recovery Statistics
+        self.recovery_stats_label = QLabel("Recovery Statistics:\nPackets Failed: 0\nPackets Recovered: 0\nRecovery Success Rate: 0%")
+        recovery_layout.addWidget(self.recovery_stats_label, 5, 0, 1, 2)
+        
+        # Recovery Queue Status
+        self.recovery_queue_label = QLabel("Recovery Queue: 0 packets pending")
+        recovery_layout.addWidget(self.recovery_queue_label, 6, 0, 1, 2)
+        
+        security_layout.addWidget(recovery_group)
+        
+        # Security Events Log Group
+        events_group = QGroupBox("🛡️ Security Events Log")
+        events_layout = QVBoxLayout(events_group)
+        
+        self.security_events_text = QTextEdit()
+        self.security_events_text.setMaximumHeight(150)
+        self.security_events_text.setReadOnly(True)
+        self.security_events_text.setPlaceholderText("Security events will appear here...")
+        events_layout.addWidget(self.security_events_text)
+        
+        # Clear Events Button
+        clear_events_btn = QPushButton("Clear Events Log")
+        clear_events_btn.clicked.connect(self.clear_security_events)
+        events_layout.addWidget(clear_events_btn)
+        
+        security_layout.addWidget(events_group)
+        
+        # Security Recommendations Group
+        recommendations_group = QGroupBox("💡 Security Recommendations")
+        recommendations_layout = QVBoxLayout(recommendations_group)
+        
+        self.recommendations_label = QLabel("No recommendations at this time.")
+        self.recommendations_label.setWordWrap(True)
+        self.recommendations_label.setStyleSheet("QLabel { background-color: #f0f8ff; padding: 8px; border-radius: 5px; }")
+        recommendations_layout.addWidget(self.recommendations_label)
+        
+        security_layout.addWidget(recommendations_group)
+        
+        layout.addWidget(security_group)
+        
         return panel
         
     def create_visualization_panel(self) -> QWidget:
@@ -835,7 +1023,134 @@ class MainWindow(QMainWindow):
         subband_layout.addWidget(self.subband_snr_plot)
         tab_widget.addTab(subband_tab, "Sub-band SNR")
         
-        layout.addWidget(tab_widget)
+        # Enhanced Security and Recovery Tab
+        security_tab = QWidget()
+        tabs.addTab(security_tab, "🔐 Security & Recovery")
+        
+        security_layout = QVBoxLayout(security_tab)
+        
+        # Encryption Controls Group
+        encryption_group = QGroupBox("🔒 AES-128 Encryption")
+        encryption_layout = QGridLayout(encryption_group)
+        
+        # Encryption Enable/Disable
+        self.encryption_enabled_cb = QCheckBox("Enable AES-128 Encryption")
+        self.encryption_enabled_cb.setChecked(False)
+        self.encryption_enabled_cb.stateChanged.connect(self.toggle_encryption)
+        encryption_layout.addWidget(self.encryption_enabled_cb, 0, 0, 1, 2)
+        
+        # Encryption Mode Selection
+        encryption_layout.addWidget(QLabel("Encryption Mode:"), 1, 0)
+        self.encryption_mode_combo = QComboBox()
+        self.encryption_mode_combo.addItems(["CTR", "GCM"])
+        self.encryption_mode_combo.setCurrentText("CTR")
+        self.encryption_mode_combo.currentTextChanged.connect(self.change_encryption_mode)
+        encryption_layout.addWidget(self.encryption_mode_combo, 1, 1)
+        
+        # Key Management
+        encryption_layout.addWidget(QLabel("Encryption Key:"), 2, 0)
+        self.encryption_key_display = QLineEdit()
+        self.encryption_key_display.setPlaceholderText("Key will be generated automatically")
+        self.encryption_key_display.setReadOnly(True)
+        encryption_layout.addWidget(self.encryption_key_display, 2, 1)
+        
+        # Key Export/Import Buttons
+        key_buttons_layout = QHBoxLayout()
+        self.export_key_btn = QPushButton("Export Key")
+        self.export_key_btn.clicked.connect(self.export_encryption_key)
+        self.import_key_btn = QPushButton("Import Key")
+        self.import_key_btn.clicked.connect(self.import_encryption_key)
+        key_buttons_layout.addWidget(self.export_key_btn)
+        key_buttons_layout.addWidget(self.import_key_btn)
+        encryption_layout.addLayout(key_buttons_layout, 3, 0, 1, 2)
+        
+        # Encryption Statistics
+        self.encryption_stats_label = QLabel("Encryption Statistics:\nPackets Encrypted: 0\nPackets Decrypted: 0\nEncryption Success Rate: 0%")
+        encryption_layout.addWidget(self.encryption_stats_label, 4, 0, 1, 2)
+        
+        security_layout.addWidget(encryption_group)
+        
+        # Data Recovery Controls Group
+        recovery_group = QGroupBox("📡 Data Recovery Algorithm")
+        recovery_layout = QGridLayout(recovery_group)
+        
+        # Recovery Enable/Disable
+        self.recovery_enabled_cb = QCheckBox("Enable Data Recovery")
+        self.recovery_enabled_cb.setChecked(True)
+        self.recovery_enabled_cb.stateChanged.connect(self.toggle_recovery)
+        recovery_layout.addWidget(self.recovery_enabled_cb, 0, 0, 1, 2)
+        
+        # Recovery Mode Selection
+        recovery_layout.addWidget(QLabel("Recovery Mode:"), 1, 0)
+        self.recovery_mode_combo = QComboBox()
+        self.recovery_mode_combo.addItems([
+            "Adaptive", "Retry Only", "Redundant Packets", 
+            "Erasure Coding", "Disabled"
+        ])
+        self.recovery_mode_combo.setCurrentText("Adaptive")
+        self.recovery_mode_combo.currentTextChanged.connect(self.change_recovery_mode)
+        recovery_layout.addWidget(self.recovery_mode_combo, 1, 1)
+        
+        # Recovery Parameters
+        recovery_layout.addWidget(QLabel("Max Retry Attempts:"), 2, 0)
+        self.max_retries_spin = QSpinBox()
+        self.max_retries_spin.setRange(1, 10)
+        self.max_retries_spin.setValue(5)
+        self.max_retries_spin.valueChanged.connect(self.update_recovery_params)
+        recovery_layout.addWidget(self.max_retries_spin, 2, 1)
+        
+        recovery_layout.addWidget(QLabel("Redundancy Factor:"), 3, 0)
+        self.redundancy_factor_spin = QSpinBox()
+        self.redundancy_factor_spin.setRange(1, 5)
+        self.redundancy_factor_spin.setValue(2)
+        self.redundancy_factor_spin.valueChanged.connect(self.update_recovery_params)
+        recovery_layout.addWidget(self.redundancy_factor_spin, 3, 1)
+        
+        # Recovery Status Display
+        self.recovery_status_label = QLabel("Recovery Status: Standby")
+        self.recovery_status_label.setStyleSheet("QLabel { background-color: #e6f3ff; padding: 5px; border-radius: 3px; }")
+        recovery_layout.addWidget(self.recovery_status_label, 4, 0, 1, 2)
+        
+        # Recovery Statistics
+        self.recovery_stats_label = QLabel("Recovery Statistics:\nPackets Failed: 0\nPackets Recovered: 0\nRecovery Success Rate: 0%")
+        recovery_layout.addWidget(self.recovery_stats_label, 5, 0, 1, 2)
+        
+        # Recovery Queue Status
+        self.recovery_queue_label = QLabel("Recovery Queue: 0 packets pending")
+        recovery_layout.addWidget(self.recovery_queue_label, 6, 0, 1, 2)
+        
+        security_layout.addWidget(recovery_group)
+        
+        # Security Events Log Group
+        events_group = QGroupBox("🛡️ Security Events Log")
+        events_layout = QVBoxLayout(events_group)
+        
+        self.security_events_text = QTextEdit()
+        self.security_events_text.setMaximumHeight(150)
+        self.security_events_text.setReadOnly(True)
+        self.security_events_text.setPlaceholderText("Security events will appear here...")
+        events_layout.addWidget(self.security_events_text)
+        
+        # Clear Events Button
+        clear_events_btn = QPushButton("Clear Events Log")
+        clear_events_btn.clicked.connect(self.clear_security_events)
+        events_layout.addWidget(clear_events_btn)
+        
+        security_layout.addWidget(events_group)
+        
+        # Security Recommendations Group
+        recommendations_group = QGroupBox("💡 Security Recommendations")
+        recommendations_layout = QVBoxLayout(recommendations_group)
+        
+        self.recommendations_label = QLabel("No recommendations at this time.")
+        self.recommendations_label.setWordWrap(True)
+        self.recommendations_label.setStyleSheet("QLabel { background-color: #f0f8ff; padding: 8px; border-radius: 5px; }")
+        recommendations_layout.addWidget(self.recommendations_label)
+        
+        security_layout.addWidget(recommendations_group)
+        
+        layout.addWidget(security_group)
+        
         return panel
         
     def setup_worker_connections(self):
@@ -966,22 +1281,301 @@ class MainWindow(QMainWindow):
             self.stop_button.setEnabled(False)
             
             self.statusBar().showMessage("Simulation stopped")
-
-def main():
-    app = QApplication(sys.argv)
     
-    # Set application style
-    app.setStyle('Fusion')
+    def toggle_encryption(self):
+        """Toggle encryption on/off"""
+        enabled = self.encryption_enabled_cb.isChecked()
+        mode = self.encryption_mode_combo.currentText()
+        
+        if hasattr(self.simulation_worker, 'enhanced_simulator') and self.simulation_worker.enhanced_simulator:
+            self.simulation_worker.enhanced_simulator.set_encryption_enabled(enabled, mode)
+            
+            # Update key display
+            if enabled:
+                key = self.simulation_worker.enhanced_simulator.export_security_key()
+                if key:
+                    self.encryption_key_display.setText(key[:16] + "..." if len(key) > 16 else key)
+            else:
+                self.encryption_key_display.setText("")
+        else:
+            self.log_security_event("⚠️ Enhanced simulator not available")
+            
+        self.log_security_event(
+            f"🔒 Encryption {'enabled' if enabled else 'disabled'} (Mode: {mode})"
+        )
     
-    # Create and show main window
-    window = MainWindow()
-    window.show()
+    def change_encryption_mode(self, mode: str):
+        """Change encryption mode"""
+        if self.encryption_enabled_cb.isChecked():
+            self.toggle_encryption()  # Re-initialize with new mode
     
-    sys.exit(app.exec_())
-
-if __name__ == "__main__":
-    main()
-
+    def export_encryption_key(self):
+        """Export encryption key to file"""
+        if hasattr(self.simulation_worker, 'enhanced_simulator'):
+            key = self.simulation_worker.enhanced_simulator.export_security_key()
+            if key:
+                filename, _ = QFileDialog.getSaveFileName(
+                    self, "Export Encryption Key", "encryption_key.txt", "Text Files (*.txt)"
+                )
+                if filename:
+                    try:
+                        with open(filename, 'w') as f:
+                            f.write(key)
+                        QMessageBox.information(self, "Success", "Encryption key exported successfully!")
+                        self.log_security_event(f"🔑 Encryption key exported to {filename}")
+                    except Exception as e:
+                        QMessageBox.critical(self, "Error", f"Failed to export key: {e}")
+            else:
+                QMessageBox.warning(self, "Warning", "No encryption key available to export!")
+    
+    def import_encryption_key(self):
+        """Import encryption key from file"""
+        filename, _ = QFileDialog.getOpenFileName(
+            self, "Import Encryption Key", "", "Text Files (*.txt);;All Files (*)"
+        )
+        if filename:
+            try:
+                with open(filename, 'r') as f:
+                    key = f.read().strip()
+                
+                if hasattr(self.simulation_worker, 'enhanced_simulator'):
+                    self.simulation_worker.enhanced_simulator.import_security_key(key)
+                    self.encryption_key_display.setText(key[:16] + "..." if len(key) > 16 else key)
+                    QMessageBox.information(self, "Success", "Encryption key imported successfully!")
+                    self.log_security_event(f"🔑 Encryption key imported from {filename}")
+                else:
+                    QMessageBox.warning(self, "Warning", "Enhanced simulator not available!")
+                    
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to import key: {e}")
+    
+    def toggle_recovery(self):
+        """Toggle data recovery on/off"""
+        enabled = self.recovery_enabled_cb.isChecked()
+        mode_str = self.recovery_mode_combo.currentText()
+        
+        # Convert mode string to enum
+        mode_map = {
+            "Disabled": "disabled",
+            "Retry Only": "retry_only", 
+            "Redundant Packets": "redundant_packets",
+            "Erasure Coding": "erasure_coding",
+            "Adaptive": "adaptive"
+        }
+        
+        if hasattr(self.simulation_worker, 'enhanced_simulator') and self.simulation_worker.enhanced_simulator:
+            if ENHANCED_FEATURES_AVAILABLE:
+                # Convert string to RecoveryMode enum
+                mode_value = mode_map.get(mode_str, "adaptive")
+                try:
+                    recovery_mode = RecoveryMode(mode_value)
+                    self.simulation_worker.enhanced_simulator.set_recovery_enabled(enabled, recovery_mode)
+                except:
+                    # Fallback if enum not available
+                    self.simulation_worker.enhanced_simulator.set_recovery_enabled(enabled)
+            else:
+                self.simulation_worker.enhanced_simulator.set_recovery_enabled(enabled)
+        else:
+            self.log_security_event("⚠️ Enhanced simulator not available")
+            
+        status = "Active" if enabled else "Disabled"
+        self.recovery_status_label.setText(f"Recovery Status: {status}")
+        self.recovery_status_label.setStyleSheet(
+            f"QLabel {{ background-color: {'#d4edda' if enabled else '#f8d7da'}; "
+            f"color: {'#155724' if enabled else '#721c24'}; padding: 5px; border-radius: 3px; }}"
+        )
+        
+        self.log_security_event(
+            f"📡 Data recovery {'enabled' if enabled else 'disabled'} (Mode: {mode_str})"
+        )
+    
+    def change_recovery_mode(self, mode: str):
+        """Change recovery mode"""
+        if self.recovery_enabled_cb.isChecked():
+            self.toggle_recovery()  # Re-initialize with new mode
+    
+    def update_recovery_params(self):
+        """Update recovery parameters"""
+        max_retries = self.max_retries_spin.value()
+        redundancy = self.redundancy_factor_spin.value()
+        
+        if hasattr(self.simulation_worker, 'enhanced_simulator') and \
+           hasattr(self.simulation_worker.enhanced_simulator, 'recovery_manager') and \
+           self.simulation_worker.enhanced_simulator.recovery_manager:
+            
+            recovery_mgr = self.simulation_worker.enhanced_simulator.recovery_manager
+            recovery_mgr.max_retry_attempts = max_retries
+            recovery_mgr.redundancy_factor = redundancy
+            
+        self.log_security_event(
+            f"⚙️ Recovery parameters updated: Max retries={max_retries}, Redundancy={redundancy}"
+        )
+    
+    def log_security_event(self, message: str):
+        """Log security events to the events display"""
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        event_text = f"[{timestamp}] {message}"
+        
+        self.security_events_text.append(event_text)
+        
+        # Auto-scroll to bottom
+        scrollbar = self.security_events_text.verticalScrollBar()
+        scrollbar.setValue(scrollbar.maximum())
+    
+    def clear_security_events(self):
+        """Clear security events log"""
+        self.security_events_text.clear()
+        self.log_security_event("🗑️ Security events log cleared")
+    
+    def update_security_displays(self):
+        """Update security-related displays with current statistics"""
+        if not hasattr(self.simulation_worker, 'enhanced_simulator'):
+            return
+        
+        simulator = self.simulation_worker.enhanced_simulator
+        
+        # Update encryption statistics
+        if simulator.encryption_processor:
+            enc_stats = simulator.encryption_processor.get_encryption_stats()
+            if enc_stats.get('encryption_enabled', False):
+                enc_text = (
+                    f"Encryption Statistics:\n"
+                    f"Packets Encrypted: {enc_stats.get('packets_encrypted', 0)}\n"
+                    f"Packets Decrypted: {enc_stats.get('packets_decrypted', 0)}\n"
+                    f"Encryption Success Rate: {enc_stats.get('encryption_success_rate', 0)*100:.1f}%\n"
+                    f"Authentication Success Rate: {enc_stats.get('authentication_success_rate', 0)*100:.1f}%"
+                )
+            else:
+                enc_text = "Encryption Statistics:\nEncryption is disabled"
+            self.encryption_stats_label.setText(enc_text)
+        
+        # Update recovery statistics
+        if simulator.recovery_manager:
+            rec_stats = simulator.recovery_manager.get_recovery_stats()
+            rec_text = (
+                f"Recovery Statistics:\n"
+                f"Packets Failed: {rec_stats.get('packets_failed', 0)}\n"
+                f"Packets Recovered: {rec_stats.get('packets_recovered', 0)}\n"
+                f"Recovery Success Rate: {rec_stats.get('recovery_success_rate', 0)*100:.1f}%\n"
+                f"Retry Success Rate: {rec_stats.get('retry_success_rate', 0)*100:.1f}%"
+            )
+            self.recovery_stats_label.setText(rec_text)
+            
+            # Update recovery queue status
+            queue_size = rec_stats.get('pending_recoveries', 0)
+            retry_queue = rec_stats.get('retry_queue_size', 0)
+            queue_text = f"Recovery Queue: {queue_size} failed packets, {retry_queue} pending retries"
+            self.recovery_queue_label.setText(queue_text)
+            
+            # Update recommendations
+            recommendations = simulator.recovery_manager.get_recovery_recommendations()
+            if recommendations.get('recommendations'):
+                rec_text = "Current Recommendations:\n" + "\n".join(recommendations['recommendations'])
+            else:
+                rec_text = "No specific recommendations at this time.\nSystem operating normally."
+            self.recommendations_label.setText(rec_text)
+    
+    def handle_security_events(self):
+        """Handle security events from the simulation worker"""
+        # This would be called by signals from the simulation worker
+        # For now, we'll update displays periodically
+        self.update_security_displays()
+        
+        # Check for specific security events
+        if hasattr(self.simulation_worker, 'enhanced_simulator'):
+            simulator = self.simulation_worker.enhanced_simulator
+            
+            # Check for high failure rates
+            if simulator.recovery_manager:
+                stats = simulator.recovery_manager.get_recovery_stats()
+                failure_rate = stats.get('packets_failed', 0) / max(1, stats.get('packets_failed', 0) + stats.get('packets_recovered', 0))
+                
+                if failure_rate > 0.3:  # 30% failure rate threshold
+                    self.log_security_event("⚠️ High packet failure rate detected!")
+                    
+                if stats.get('pending_recoveries', 0) > 10:
+                    self.log_security_event("📊 Recovery queue is getting large - consider adjusting parameters")
+                    
+            # Check encryption status
+            if simulator.encryption_processor:
+                enc_stats = simulator.encryption_processor.get_encryption_stats()
+                if enc_stats.get('authentication_failures', 0) > 0:
+                    self.log_security_event("🚨 Authentication failures detected - possible tampering!")
+    
+    def export_security_report(self):
+        """Export comprehensive security report"""
+        if not hasattr(self.simulation_worker, 'enhanced_simulator'):
+            QMessageBox.warning(self, "Warning", "Enhanced simulator not available!")
+            return
+        
+        filename, _ = QFileDialog.getSaveFileName(
+            self, "Export Security Report", "security_report.txt", "Text Files (*.txt)"
+        )
+        
+        if filename:
+            try:
+                simulator = self.simulation_worker.enhanced_simulator
+                
+                with open(filename, 'w') as f:
+                    f.write("TEKNOFEST 2025 - Security and Recovery Report\n")
+                    f.write("=" * 50 + "\n")
+                    f.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+                    
+                    # Encryption Report
+                    f.write("ENCRYPTION STATUS\n")
+                    f.write("-" * 20 + "\n")
+                    if simulator.encryption_processor:
+                        enc_stats = simulator.encryption_processor.get_encryption_stats()
+                        f.write(f"Encryption Enabled: {enc_stats.get('encryption_enabled', False)}\n")
+                        f.write(f"Encryption Mode: {enc_stats.get('encryption_mode', 'N/A')}\n")
+                        f.write(f"Packets Encrypted: {enc_stats.get('packets_encrypted', 0)}\n")
+                        f.write(f"Packets Decrypted: {enc_stats.get('packets_decrypted', 0)}\n")
+                        f.write(f"Encryption Success Rate: {enc_stats.get('encryption_success_rate', 0)*100:.2f}%\n")
+                        f.write(f"Authentication Success Rate: {enc_stats.get('authentication_success_rate', 0)*100:.2f}%\n")
+                    else:
+                        f.write("Encryption not available\n")
+                    
+                    f.write("\n")
+                    
+                    # Recovery Report
+                    f.write("RECOVERY STATUS\n")
+                    f.write("-" * 15 + "\n")
+                    if simulator.recovery_manager:
+                        rec_stats = simulator.recovery_manager.get_recovery_stats()
+                        f.write(f"Recovery Enabled: {rec_stats.get('recovery_enabled', False)}\n")
+                        f.write(f"Recovery Mode: {rec_stats.get('recovery_mode', 'N/A')}\n")
+                        f.write(f"Packets Failed: {rec_stats.get('packets_failed', 0)}\n")
+                        f.write(f"Packets Recovered: {rec_stats.get('packets_recovered', 0)}\n")
+                        f.write(f"Recovery Success Rate: {rec_stats.get('recovery_success_rate', 0)*100:.2f}%\n")
+                        f.write(f"Retry Attempts: {rec_stats.get('retry_attempts', 0)}\n")
+                        f.write(f"Retry Success Rate: {rec_stats.get('retry_success_rate', 0)*100:.2f}%\n")
+                        f.write(f"Pending Recoveries: {rec_stats.get('pending_recoveries', 0)}\n")
+                        
+                        # Recommendations
+                        recommendations = simulator.recovery_manager.get_recovery_recommendations()
+                        f.write(f"\nRecommendations:\n")
+                        for rec in recommendations.get('recommendations', []):
+                            f.write(f"  - {rec}\n")
+                    else:
+                        f.write("Recovery not available\n")
+                    
+                    f.write("\n")
+                    
+                    # Overall Statistics
+                    overall_stats = simulator.get_comprehensive_stats()
+                    f.write("OVERALL TRANSMISSION STATISTICS\n")
+                    f.write("-" * 32 + "\n")
+                    f.write(f"Total Packets Sent: {overall_stats.get('total_packets_sent', 0)}\n")
+                    f.write(f"Total Packets Received: {overall_stats.get('total_packets_received', 0)}\n")
+                    f.write(f"Recovered Packets: {overall_stats.get('recovered_packets', 0)}\n")
+                    f.write(f"Failed Recoveries: {overall_stats.get('failed_recoveries', 0)}\n")
+                
+                QMessageBox.information(self, "Success", f"Security report exported to {filename}")
+                self.log_security_event(f"📋 Security report exported to {filename}")
+                
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to export report: {e}")
+                
 class SubBandSNRPlot(QWidget):
     """Sub-band SNR visualization widget"""
     
@@ -1075,3 +1669,42 @@ class SubBandSNRPlot(QWidget):
                       loc='upper right')
         
         self.canvas.draw()
+
+    def _handle_security_event(self, event_type: str, message: str, data: dict = None):
+        """Handle security events from the enhanced simulator"""
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        if event_type == "info":
+            emoji = "🔐"
+        elif event_type == "warning":
+            emoji = "⚠️"
+        elif event_type == "critical":
+            emoji = "🚨"
+        else:
+            emoji = "ℹ️"
+        
+        log_message = f"[{timestamp}] {emoji} Security: {message}"
+        self.log_message.emit(log_message)
+        
+        # Update security statistics if data provided
+        if data:
+            self.security_stats.update(data)
+    
+    def _handle_recovery_event(self, event_type: str, message: str, data: dict = None):
+        """Handle recovery events from the enhanced simulator"""
+
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        if event_type == "info":
+            emoji = "📦"
+        elif event_type == "warning":
+            emoji = "⚠️"
+        elif event_type == "retry":
+            emoji = "🔄"
+        else:
+            emoji = "ℹ️"
+        
+        log_message = f"[{timestamp}] {emoji} Recovery: {message}"
+        self.log_message.emit(log_message)
+        
+        # Update recovery statistics if data provided
+        if data:
+            self.recovery_stats.update(data)
